@@ -513,6 +513,7 @@ document.getElementById('esN1').classList.add('active');
 await add('[ESCROW] Intercepting transaction...','log-info',700);
 document.getElementById('esN2').classList.add('active');
 await sleep(700);
+const RENDER="https://kebsprotocol.onrender.com";
 const flagged=reports.some(r=>r.addr.toLowerCase()===sender.toLowerCase());
 await add('[REGISTRY] Querying FraudWatch contract...','log-info',600);
 document.getElementById('esN3').classList.add('active');
@@ -520,6 +521,11 @@ await sleep(600);
 if(flagged){
 await add('[MATCH] Address found in FraudWatch registry!','log-freeze',400);
 await add('[FREEZE] Funds frozen pending dispute resolution.','log-freeze',300);
+    try{
+      const fr=await fetch(RENDER+'/api/freeze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({address:sender,amount:amt,caseReason:'FraudWatch registry match'})});
+      const fd=await fr.json();
+      if(fd.success) await add('[CIRCLE] Case '+fd.caseId+' created on Render backend.','log-freeze',200);
+    }catch(e){ await add('[CIRCLE] API error: '+e.message,'log-warn',200); }
 document.getElementById('esN2').className='es-node frozen';
 document.getElementById('esN2').innerHTML='ESCROW<br/><small>FROZEN ❄</small>';
 await add('[DISPUTE] Case #'+Math.floor(Math.random()*9000+1000)+' created.','log-warn',300);
