@@ -378,7 +378,7 @@ document.getElementById('riskVerdict').textContent=verdict;
 renderFlags(matched,txs.flags);
 renderTxs(txs.list);
 renderAddrReports(matched);
-await runAI(addr,score,matched,txs,verdict);
+const explanation=generateExplanation(score,matched,txs,verdict); await typeText('aiText',explanation);
 currentAnalysis={addr,score,verdict,matched,txs};
 document.getElementById('checkAlert').classList.remove('show');
 }
@@ -423,6 +423,19 @@ if(!matched.length){el.innerHTML='<div class="empty" style="padding:.8rem">No re
 el.innerHTML=matched.map(r=>`<div class="report-item"><div><div style="font-family:Space Mono,monospace;font-size:.7rem;margin-bottom:.2rem">${r.ev}</div><div class="rep-meta">${ago(r.ts)} · ${r.reporter}</div></div><div style="text-align:right;flex-shrink:0"><div class="cat-tag cat-${r.cat.replace(' ','')}">${r.cat}</div><div class="rep-meta" style="margin-top:.3rem">▲ ${r.votes}</div></div></div>`).join('');
 }
 
+
+function generateExplanation(score, matched, txs, verdict){
+  if(score>=70){
+    const cats=matched.map(r=>r.cat).join(', ');
+    const votes=matched.reduce((s,r)=>s+r.votes,0);
+    return `This wallet is HIGH RISK and should be avoided. It has ${matched.length} community report${matched.length!==1?'s':''} flagging it for ${cats||'suspicious activity'}, with ${votes} upvotes confirming the reports. ${txs.flags.map(f=>f.t).join('. ')}. Do not send funds to this address.`;
+  } else if(score>=40){
+    return `This wallet shows MODERATE RISK. While not definitively malicious, ${txs.flags.map(f=>f.t).join(' and ')} which warrants caution. Verify the identity of this wallet before sending any funds.`;
+  } else {
+    return `This wallet appears LOW RISK based on available data. No community reports were found and the transaction history shows no obvious red flags. Always exercise caution with unknown wallets.`;
+  }
+}
+
 async function runAI(addr,score,matched,txs,verdict){
 const flags=txs.flags.map(f=>f.t).join(', ');
 const cats=matched.map(r=>r.cat).join(', ');
@@ -435,16 +448,8 @@ Community Reports: ${matched.length} (${cats||'none'})
 Transaction Flags: ${flags||'none'}
 Total Upvotes: ${matched.reduce((s,r)=>s+r.votes,0)}`;
 
-try{
-const res=await fetch('https://api.anthropic.com/v1/messages',{
-method:'POST',
-headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
-});
-const data=await res.json();
-const text=data.content?.map(c=>c.text||'').join('')||'Analysis unavailable.';
-await typeText('aiText',text);
-}catch(e){document.getElementById('aiText').textContent='AI analysis unavailable — add API key in source.';}
+const explanation = generateExplanation(score, matched, txs, verdict);
+await typeText('aiText', explanation);
 }
 
 async function typeText(id,text){
